@@ -1,0 +1,493 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Shared constants ──────────────────────────────────────────────────── */
+:root {
+  --sidebar-w: 220px;
+  --bar-h: 44px;
+  --radius: 6px;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+}
+
+/* ── Dark theme ────────────────────────────────────────────────────────── */
+[data-ui-theme="dark"] {
+  --ui-bg: #0f172a;
+  --ui-panel: #1a2234;
+  --ui-sidebar: #0b1220;
+  --ui-border: #2d3f55;
+  --ui-text: #e2e8f0;
+  --ui-muted: #7a92aa;
+  --editor-bg: #111827;
+  --editor-toolbar: #141f30;
+}
+
+/* ── Light theme ───────────────────────────────────────────────────────── */
+[data-ui-theme="light"] {
+  --ui-bg: #f0f4f8;
+  --ui-panel: #ffffff;
+  --ui-sidebar: #1e293b;
+  --ui-border: #dde3ec;
+  --ui-text: #1e293b;
+  --ui-muted: #5a6a7e;
+  --editor-bg: #ffffff;
+  --editor-toolbar: #f1f5f9;
+}
+
+html {
+  font-size: 15px;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+/* ── Top bar ───────────────────────────────────────────────────────────── */
+.top-bar {
+  height: var(--bar-h);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  flex-shrink: 0;
+}
+
+.top-bar-hamburger {
+  background: none;
+  border: none;
+  color: var(--ui-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.top-bar-hamburger:hover {
+  color: var(--ui-text);
+  background: var(--ui-border);
+}
+
+.top-bar-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--ui-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.top-bar-doc-title {
+  font-size: 13px;
+  color: var(--ui-muted);
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--ui-text);
+  padding: 2px 6px;
+  border-radius: 3px;
+  outline: none;
+  max-width: 220px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.top-bar-doc-title:focus {
+  border-bottom-color: var(--accent);
+  background: var(--ui-bg);
+}
+
+.top-bar-spacer { flex: 1; }
+
+.btn-download {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 6px 13px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-download:hover { background: var(--accent-hover); }
+.btn-download:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Main area (sidebar + split pane) ──────────────────────────────────── */
+.main-area {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - var(--bar-h));
+  overflow: hidden;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--ui-sidebar);
+  border-right: 1px solid var(--ui-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.2s ease;
+  z-index: 100;
+}
+
+.sidebar-inner {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.sidebar-logo {
+  padding: 14px 16px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ui-text);
+  letter-spacing: -0.2px;
+  border-bottom: 1px solid var(--ui-border);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.sidebar-logo-icon {
+  font-size: 16px;
+}
+
+.sidebar-section {
+  padding: 10px 16px 4px;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+  margin-bottom: 8px;
+}
+
+.sidebar-title-input {
+  width: 100%;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  padding: 6px 9px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sidebar-title-input:focus {
+  border-color: var(--accent);
+}
+
+.sidebar-theme-select {
+  width: 100%;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  padding: 6px 9px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sidebar-theme-select:focus {
+  border-color: var(--accent);
+}
+
+.ui-theme-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.ui-theme-btn {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--ui-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ui-theme-btn:hover {
+  color: var(--ui-text);
+  border-color: var(--accent);
+}
+.ui-theme-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sidebar-stats {
+  padding: 10px 16px 6px;
+  font-size: 12px;
+  color: var(--ui-muted);
+  line-height: 1.9;
+}
+.sidebar-stat-row {
+  display: flex;
+  justify-content: space-between;
+}
+.sidebar-stat-val {
+  font-weight: 600;
+  color: var(--ui-text);
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--ui-border);
+  margin: 8px 0;
+}
+
+/* ── Split pane ────────────────────────────────────────────────────────── */
+.split-pane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--ui-border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.drag-handle {
+  width: 6px;
+  background: var(--ui-border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+}
+.drag-handle:hover,
+.drag-handle.dragging {
+  background: var(--accent);
+}
+.drag-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.preview-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* Fixed neutral background — does not change with UI theme */
+  background: #d1d5db;
+  overflow: hidden;
+}
+
+.pane-label {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+  background: var(--ui-panel);
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Editor overrides ──────────────────────────────────────────────────── */
+.editor-pane .w-md-editor {
+  flex: 1;
+  height: 100% !important;
+  background: var(--editor-bg) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-size: 15px !important;
+}
+
+.w-md-editor-toolbar {
+  background: var(--editor-toolbar) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  padding: 4px 6px !important;
+}
+
+/* Make toolbar buttons and icons larger */
+.w-md-editor-toolbar li > button {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.w-md-editor-toolbar li > button svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* Toolbar icons: light mode needs dark icons */
+[data-ui-theme="light"] .w-md-editor-toolbar button,
+[data-ui-theme="light"] .w-md-editor-toolbar svg {
+  color: #374151 !important;
+  fill: #374151 !important;
+}
+
+.editor-pane .w-md-editor-content {
+  height: 100% !important;
+  background: var(--editor-bg) !important;
+}
+
+/* textarea does NOT inherit color — must be set explicitly */
+.editor-pane .w-md-editor-text-input,
+.editor-pane .w-md-editor textarea {
+  color: var(--ui-text) !important;
+  -webkit-text-fill-color: var(--ui-text) !important;
+  background: var(--editor-bg) !important;
+  caret-color: var(--ui-text) !important;
+}
+
+/* Rendered token colours inside the code mirror layer */
+[data-ui-theme="light"] .w-md-editor .w-md-editor-text {
+  color: #1e293b !important;
+}
+[data-ui-theme="dark"] .w-md-editor .w-md-editor-text {
+  color: #e2e8f0 !important;
+}
+
+/* ── Preview scroll ────────────────────────────────────────────────────── */
+.preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  position: relative;
+  background: #c8ccd5;
+}
+
+.docx-render-container {
+  min-height: 100%;
+  /* Hard reset — prevents UI theme color from bleeding into DOCX content */
+  color: #000000;
+  background: #c8ccd5;
+}
+
+/* docx-preview outer wrapper: gray "desktop" around the white paper */
+.docx-render-container .docx-wrapper {
+  background: #c8ccd5 !important;
+  padding: 20px 20px 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* The actual white page — must always be white regardless of UI theme */
+.docx-render-container .docx-wrapper > section.docx {
+  background: white !important;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.35) !important;
+  margin-bottom: 20px !important;
+}
+
+/* ── States ────────────────────────────────────────────────────────────── */
+.preview-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #475569;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.converting-dot {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #cbd5e1;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-box {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13px;
+  max-width: 400px;
+  text-align: center;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+.preview-scroll::-webkit-scrollbar,
+.sidebar-inner::-webkit-scrollbar {
+  width: 6px;
+}
+.preview-scroll::-webkit-scrollbar-track,
+.sidebar-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+.preview-scroll::-webkit-scrollbar-thumb,
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: var(--ui-border);
+  border-radius: 3px;
+}
+.preview-scroll::-webkit-scrollbar-thumb:hover,
+.sidebar-inner::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-muted);
+}
