@@ -1,5 +1,3 @@
-# MD DOC Converter (Private Markdown to DOCX)
-
 ## Problem
 LLMs generate output in Markdown, but teams often need a high-quality DOCX for final delivery. The gap is not just conversion, but fidelity: preserving table layout, theme colors, heading structure, list formatting, code blocks, and Word-native fields.
 
