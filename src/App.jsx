@@ -8,6 +8,17 @@ import { convertMarkdownToDocx } from './lib/markdownToDocx.js'
 import '@uiw/react-md-editor/markdown-editor.css'
 import '@uiw/react-markdown-preview/markdown.css'
 
+const STORAGE_KEYS = {
+  uiTheme: 'md-docx-ui-theme',
+  docTheme: 'md-docx-doc-theme',
+  sidebarOpen: 'md-docx-sidebar-open',
+  splitPct: 'md-docx-split-pct',
+  markdown: 'md-docx-markdown',
+  docTitle: 'md-docx-doc-title',
+}
+
+const MOBILE_BREAKPOINT = 980
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Default example markdown
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,19 +100,42 @@ That's it! Use the **Theme** dropdown in the sidebar to switch color schemes, th
 // App
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [markdown, setMarkdown] = useState(DEFAULT_MARKDOWN)
-  const [selectedTheme, setSelectedTheme] = useState('professional')
+  const [markdown, setMarkdown] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEYS.markdown)
+    return saved != null ? saved : DEFAULT_MARKDOWN
+  })
+  const [selectedTheme, setSelectedTheme] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEYS.docTheme)
+    return saved && themeKeys.includes(saved) ? saved : 'professional'
+  })
   const [isConverting, setIsConverting] = useState(false)
   const [conversionError, setConversionError] = useState(null)
 
   // ── New UI state ─────────────────────────────────────────────────────────
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [uiTheme, setUiTheme] = useState('dark')
-  const [docTitle, setDocTitle] = useState('My Document')
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEYS.sidebarOpen)
+    if (saved != null) return saved === 'true'
+    return window.innerWidth > MOBILE_BREAKPOINT
+  })
+  const [uiTheme, setUiTheme] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEYS.uiTheme)
+    return saved === 'light' ? 'light' : 'dark'
+  })
+  const [docTitle, setDocTitle] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEYS.docTitle)
+    return saved != null ? saved : 'My Document'
+  })
   const [wordCount, setWordCount] = useState(0)
   const [lineCount, setLineCount] = useState(0)
-  const [splitPct, setSplitPct] = useState(50)
+  const [splitPct, setSplitPct] = useState(() => {
+    const saved = Number(sessionStorage.getItem(STORAGE_KEYS.splitPct))
+    if (Number.isFinite(saved) && saved >= 25 && saved <= 75) return saved
+    return 50
+  })
   const [isDragging, setIsDragging] = useState(false)
+  const [isNarrowViewport, setIsNarrowViewport] = useState(
+    window.innerWidth <= MOBILE_BREAKPOINT,
+  )
 
   const previewRef = useRef(null)
   const debounceRef = useRef(null)
@@ -112,24 +146,61 @@ export default function App() {
     document.documentElement.setAttribute('data-ui-theme', uiTheme)
     // react-md-editor reads data-color-mode from the html element
     document.documentElement.setAttribute('data-color-mode', uiTheme)
+    sessionStorage.setItem(STORAGE_KEYS.uiTheme, uiTheme)
   }, [uiTheme])
 
   // ── Word / line counts ───────────────────────────────────────────────────
   useEffect(() => {
     const text = markdown.trim()
+    const trimmedLines = markdown.replace(/\s+$/, '')
     setWordCount(text ? text.split(/\s+/).length : 0)
-    setLineCount(markdown.split('\n').length)
+    setLineCount(trimmedLines ? trimmedLines.split('\n').length : 0)
+    sessionStorage.setItem(STORAGE_KEYS.markdown, markdown)
   }, [markdown])
+
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEYS.docTheme, selectedTheme)
+  }, [selectedTheme])
+
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEYS.sidebarOpen, String(sidebarOpen))
+  }, [sidebarOpen])
+
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEYS.splitPct, String(splitPct))
+  }, [splitPct])
+
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEYS.docTitle, docTitle)
+  }, [docTitle])
+
+  useEffect(() => {
+    const onResize = () => setIsNarrowViewport(window.innerWidth <= MOBILE_BREAKPOINT)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    document.body.classList.toggle('is-dragging', isDragging)
+    return () => document.body.classList.remove('is-dragging')
+  }, [isDragging])
 
   // ── Live preview with debounce ───────────────────────────────────────────
   const runPreview = useCallback(async (md, themeKey) => {
     if (!previewRef.current) return
+
+    if (!md.trim()) {
+      setConversionError(null)
+      setIsConverting(false)
+      previewRef.current.replaceChildren()
+      return
+    }
+
     setIsConverting(true)
     setConversionError(null)
     try {
       const blob = await convertMarkdownToDocx(md, themes[themeKey])
       await renderAsync(blob, previewRef.current, null, {
-        className: 'docx-wrapper',
         inWrapper: true,
         ignoreWidth: true,
         ignoreHeight: false,
@@ -160,6 +231,8 @@ export default function App() {
 
   // ── Download ─────────────────────────────────────────────────────────────
   const handleDownload = async () => {
+    if (!markdown.trim()) return
+
     try {
       const blob = await convertMarkdownToDocx(markdown, themes[selectedTheme])
       saveAs(blob, `${docTitle || 'document'}.docx`)
@@ -170,21 +243,40 @@ export default function App() {
   }
 
   // ── Drag-handle resize ───────────────────────────────────────────────────
+  function updateSplit(clientX) {
+    if (!splitRef.current) return
+    const rect = splitRef.current.getBoundingClientRect()
+    const pct = ((clientX - rect.left) / rect.width) * 100
+    setSplitPct(Math.min(75, Math.max(25, pct)))
+  }
+
   function startDrag(e) {
+    if (isNarrowViewport) return
     e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
     setIsDragging(true)
-    const onMove = (ev) => {
-      if (!splitRef.current) return
-      const rect = splitRef.current.getBoundingClientRect()
-      const pct = ((ev.clientX - rect.left) / rect.width) * 100
-      setSplitPct(Math.min(75, Math.max(25, pct)))
-    }
-    const onUp = () => {
+
+    const onMove = (ev) => updateSplit(ev.clientX)
+    const stopDrag = () => {
       setIsDragging(false)
-      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', stopDrag)
+      document.removeEventListener('pointercancel', stopDrag)
     }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp, { once: true })
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', stopDrag)
+    document.addEventListener('pointercancel', stopDrag)
+  }
+
+  function handleResizeKeyDown(e) {
+    if (isNarrowViewport) return
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setSplitPct((pct) => Math.max(25, pct - 2))
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      setSplitPct((pct) => Math.min(75, pct + 2))
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -194,7 +286,9 @@ export default function App() {
       <div className="top-bar">
         <button
           className="top-bar-hamburger"
+          type="button"
           onClick={() => setSidebarOpen(o => !o)}
+          aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         >
           ☰
@@ -205,13 +299,15 @@ export default function App() {
           value={docTitle}
           onChange={e => setDocTitle(e.target.value)}
           title="Document title"
+          aria-label="Document title"
           spellCheck={false}
         />
         <div className="top-bar-spacer" />
         <button
           className="btn-download"
+          type="button"
           onClick={handleDownload}
-          disabled={isConverting}
+          disabled={isConverting || !markdown.trim()}
         >
           ⬇ Download DOCX
         </button>
@@ -220,7 +316,11 @@ export default function App() {
       {/* Main area */}
       <div className="main-area">
         {/* Sidebar */}
-        <aside className="sidebar" style={{ width: sidebarOpen ? 'var(--sidebar-w)' : '0' }}>
+        <aside
+          className="sidebar"
+          style={{ width: sidebarOpen ? 'var(--sidebar-w)' : '0' }}
+          aria-hidden={!sidebarOpen}
+        >
           <div className="sidebar-inner">
             <div className="sidebar-logo">
               <span className="sidebar-logo-icon">📄</span>
@@ -235,6 +335,7 @@ export default function App() {
                 value={docTitle}
                 onChange={e => setDocTitle(e.target.value)}
                 placeholder="Document title"
+                aria-label="Sidebar document title"
                 spellCheck={false}
               />
             </div>
@@ -248,6 +349,7 @@ export default function App() {
                 className="sidebar-theme-select"
                 value={selectedTheme}
                 onChange={e => setSelectedTheme(e.target.value)}
+                aria-label="DOCX theme"
               >
                 {themeKeys.map(key => (
                   <option key={key} value={key}>{themes[key].name}</option>
@@ -264,12 +366,14 @@ export default function App() {
                 <button
                   className={`ui-theme-btn${uiTheme === 'dark' ? ' active' : ''}`}
                   onClick={() => setUiTheme('dark')}
+                  type="button"
                 >
                   🌙 Dark
                 </button>
                 <button
                   className={`ui-theme-btn${uiTheme === 'light' ? ' active' : ''}`}
                   onClick={() => setUiTheme('light')}
+                  type="button"
                 >
                   ☀ Light
                 </button>
@@ -292,11 +396,19 @@ export default function App() {
             </div>
           </div>
         </aside>
+        {isNarrowViewport && sidebarOpen ? (
+          <button
+            className="sidebar-backdrop"
+            type="button"
+            aria-label="Close sidebar"
+            onClick={() => setSidebarOpen(false)}
+          />
+        ) : null}
 
         {/* Split pane */}
         <div className="split-pane" ref={splitRef}>
           {/* Editor pane */}
-          <div className="editor-pane" style={{ width: splitPct + '%' }}>
+          <div className="editor-pane" style={{ width: isNarrowViewport ? '100%' : splitPct + '%' }}>
             <div className="pane-label">Markdown</div>
             <MDEditor
               value={markdown}
@@ -312,7 +424,16 @@ export default function App() {
           {/* Drag handle */}
           <div
             className={`drag-handle${isDragging ? ' dragging' : ''}`}
-            onMouseDown={startDrag}
+            onPointerDown={startDrag}
+            onDoubleClick={() => setSplitPct(50)}
+            onKeyDown={handleResizeKeyDown}
+            role="separator"
+            tabIndex={isNarrowViewport ? -1 : 0}
+            aria-orientation="vertical"
+            aria-valuemin={25}
+            aria-valuemax={75}
+            aria-valuenow={Math.round(splitPct)}
+            aria-label="Resize editor and preview"
           />
 
           {/* Preview pane */}
