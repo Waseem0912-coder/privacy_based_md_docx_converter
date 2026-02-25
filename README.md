@@ -1,7 +1,15 @@
 # MD DOC Converter (Private Markdown to DOCX)
 
 ## Problem
-LLMs generate output in Markdown, but there is no simple privacy-first tool to load highly confidential Markdown and convert it to DOCX locally.
+LLMs generate output in Markdown, but teams often need a high-quality DOCX for final delivery. The gap is not just conversion, but fidelity: preserving table layout, theme colors, heading structure, list formatting, code blocks, and Word-native fields.
+
+Many existing Python Markdown-to-DOCX libraries can do basic conversion, but often fall short for polished, production-quality documents because they may:
+- Flatten or simplify styling, causing loss of color/theme consistency.
+- Render complex tables, nested lists, and task lists inconsistently.
+- Miss Word-native structure (for example TOC/page fields and robust numbering behavior).
+- Prioritize simple export over live editing + preview workflows needed for iterative LLM content refinement.
+
+This creates a need for a privacy-first, local tool that can handle highly confidential Markdown while generating high-fidelity DOCX output.
 
 ## Solution
 This project is a local-first Markdown to DOCX editor/previewer built with React + Vite and `docx` (Node/JS ecosystem).
