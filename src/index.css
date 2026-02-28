@@ -166,6 +166,36 @@ body {
 
 .top-bar-spacer { flex: 1; }
 
+.btn-copy {
+  background: var(--chip-bg);
+  color: var(--ui-text);
+  border: 1px solid var(--panel-line);
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-copy:hover {
+  background: rgba(79, 141, 249, 0.12);
+  border-color: rgba(79, 141, 249, 0.4);
+  transform: translateY(-1px);
+}
+.btn-copy.copied {
+  background: rgba(14, 159, 110, 0.14);
+  border-color: rgba(14, 159, 110, 0.45);
+}
+.btn-copy.error {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
 .btn-download {
   background: var(--download-bg);
   color: #fff;
@@ -189,7 +219,13 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 14px 24px rgba(32, 80, 188, 0.38);
 }
-.btn-download:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-copy:disabled,
+.btn-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
 
 button:focus-visible,
 input:focus-visible,
@@ -276,6 +312,26 @@ select:focus-visible,
   text-transform: uppercase;
   color: var(--sidebar-muted);
   margin-bottom: 8px;
+}
+
+.sidebar-layout-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--sidebar-fg);
+}
+
+.sidebar-checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
 }
 
 .sidebar-title-input {
@@ -719,6 +775,7 @@ body.is-dragging * {
     display: none;
   }
 
+  .btn-copy,
   .btn-download {
     font-size: 12px;
     padding: 6px 10px;

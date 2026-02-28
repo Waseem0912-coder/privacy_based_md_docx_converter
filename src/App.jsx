@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   splitPct: 'md-docx-split-pct',
   markdown: 'md-docx-markdown',
   docTitle: 'md-docx-doc-title',
+  docxLayout: 'md-docx-layout',
 }
 
 const MOBILE_BREAKPOINT = 980
@@ -125,6 +126,21 @@ export default function App() {
     const saved = sessionStorage.getItem(STORAGE_KEYS.docTitle)
     return saved != null ? saved : 'My Document'
   })
+  const [docxLayout, setDocxLayout] = useState(() => {
+    const defaults = { includeToc: true, includeHeader: false, includeFooter: true }
+    const saved = sessionStorage.getItem(STORAGE_KEYS.docxLayout)
+    if (!saved) return defaults
+    try {
+      const parsed = JSON.parse(saved)
+      return {
+        includeToc: typeof parsed.includeToc === 'boolean' ? parsed.includeToc : defaults.includeToc,
+        includeHeader: typeof parsed.includeHeader === 'boolean' ? parsed.includeHeader : defaults.includeHeader,
+        includeFooter: typeof parsed.includeFooter === 'boolean' ? parsed.includeFooter : defaults.includeFooter,
+      }
+    } catch (_) {
+      return defaults
+    }
+  })
   const [wordCount, setWordCount] = useState(0)
   const [lineCount, setLineCount] = useState(0)
   const [splitPct, setSplitPct] = useState(() => {
@@ -133,12 +149,14 @@ export default function App() {
     return 50
   })
   const [isDragging, setIsDragging] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('idle')
   const [isNarrowViewport, setIsNarrowViewport] = useState(
     window.innerWidth <= MOBILE_BREAKPOINT,
   )
 
   const previewRef = useRef(null)
   const debounceRef = useRef(null)
+  const copyResetRef = useRef(null)
   const splitRef = useRef(null)
 
   // ── Apply UI theme to <html> ─────────────────────────────────────────────
@@ -175,6 +193,10 @@ export default function App() {
   }, [docTitle])
 
   useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEYS.docxLayout, JSON.stringify(docxLayout))
+  }, [docxLayout])
+
+  useEffect(() => {
     const onResize = () => setIsNarrowViewport(window.innerWidth <= MOBILE_BREAKPOINT)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
@@ -185,8 +207,12 @@ export default function App() {
     return () => document.body.classList.remove('is-dragging')
   }, [isDragging])
 
+  useEffect(() => () => {
+    if (copyResetRef.current) clearTimeout(copyResetRef.current)
+  }, [])
+
   // ── Live preview with debounce ───────────────────────────────────────────
-  const runPreview = useCallback(async (md, themeKey) => {
+  const runPreview = useCallback(async (md, themeKey, layout, title) => {
     if (!previewRef.current) return
 
     if (!md.trim()) {
@@ -199,7 +225,10 @@ export default function App() {
     setIsConverting(true)
     setConversionError(null)
     try {
-      const blob = await convertMarkdownToDocx(md, themes[themeKey])
+      const blob = await convertMarkdownToDocx(md, themes[themeKey], {
+        ...layout,
+        headerTitle: title,
+      })
       await renderAsync(blob, previewRef.current, null, {
         inWrapper: true,
         ignoreWidth: true,
@@ -222,19 +251,76 @@ export default function App() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      runPreview(markdown, selectedTheme)
+      runPreview(markdown, selectedTheme, docxLayout, docTitle)
     }, 900)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [markdown, selectedTheme, runPreview])
+  }, [markdown, selectedTheme, docxLayout, docTitle, runPreview])
+
+  function flashCopyStatus(status) {
+    setCopyStatus(status)
+    if (copyResetRef.current) clearTimeout(copyResetRef.current)
+    copyResetRef.current = setTimeout(() => {
+      setCopyStatus('idle')
+    }, 1800)
+  }
+
+  async function handleCopyPreview() {
+    if (!previewRef.current) return
+    const pages = Array.from(previewRef.current.querySelectorAll('section.docx, section.docx-wrapper'))
+    if (pages.length === 0) {
+      flashCopyStatus('error')
+      return
+    }
+
+    const styles = Array.from(previewRef.current.querySelectorAll('style'))
+      .map((node) => node.textContent || '')
+      .filter(Boolean)
+      .join('\n')
+    const pagesHtml = pages.map((page) => page.outerHTML).join('')
+    const plainText = pages
+      .map((page) => page.innerText || page.textContent || '')
+      .filter(Boolean)
+      .join('\n\n')
+    const richHtml = `<!doctype html><html><head><meta charset="utf-8">${styles ? `<style>${styles}</style>` : ''}</head><body>${pagesHtml}</body></html>`
+
+    try {
+      if (navigator.clipboard?.write && window.ClipboardItem) {
+        const item = new ClipboardItem({
+          'text/html': new Blob([richHtml], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        })
+        await navigator.clipboard.write([item])
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(plainText)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = plainText
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      flashCopyStatus('copied')
+    } catch (err) {
+      console.error('Copy failed:', err)
+      flashCopyStatus('error')
+    }
+  }
 
   // ── Download ─────────────────────────────────────────────────────────────
   const handleDownload = async () => {
     if (!markdown.trim()) return
 
     try {
-      const blob = await convertMarkdownToDocx(markdown, themes[selectedTheme])
+      const blob = await convertMarkdownToDocx(markdown, themes[selectedTheme], {
+        ...docxLayout,
+        headerTitle: docTitle,
+      })
       saveAs(blob, `${docTitle || 'document'}.docx`)
     } catch (err) {
       console.error('Download error:', err)
@@ -304,6 +390,15 @@ export default function App() {
         />
         <div className="top-bar-spacer" />
         <button
+          className={`btn-copy${copyStatus === 'copied' ? ' copied' : ''}${copyStatus === 'error' ? ' error' : ''}`}
+          type="button"
+          onClick={handleCopyPreview}
+          disabled={isConverting || !markdown.trim()}
+          title="Copy DOCX preview content"
+        >
+          {copyStatus === 'copied' ? '✓ Copied' : copyStatus === 'error' ? 'Copy failed' : '⎘ Copy'}
+        </button>
+        <button
           className="btn-download"
           type="button"
           onClick={handleDownload}
@@ -355,6 +450,39 @@ export default function App() {
                   <option key={key} value={key}>{themes[key].name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="sidebar-divider" />
+
+            {/* DOCX Layout section */}
+            <div className="sidebar-section">
+              <div className="sidebar-section-label">DOCX Layout</div>
+              <div className="sidebar-layout-options">
+                <label className="sidebar-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={docxLayout.includeToc}
+                    onChange={(e) => setDocxLayout((prev) => ({ ...prev, includeToc: e.target.checked }))}
+                  />
+                  <span>Table of Contents</span>
+                </label>
+                <label className="sidebar-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={docxLayout.includeHeader}
+                    onChange={(e) => setDocxLayout((prev) => ({ ...prev, includeHeader: e.target.checked }))}
+                  />
+                  <span>Header</span>
+                </label>
+                <label className="sidebar-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={docxLayout.includeFooter}
+                    onChange={(e) => setDocxLayout((prev) => ({ ...prev, includeFooter: e.target.checked }))}
+                  />
+                  <span>Footer (page numbers)</span>
+                </label>
+              </div>
             </div>
 
             <div className="sidebar-divider" />

@@ -596,9 +596,15 @@ function buildNumberingConfig() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Build the full Document (TOC + content)
+// Build the full Document (optional TOC/header/footer + content)
 // ─────────────────────────────────────────────────────────────────────────────
-function buildDocument(contentElements, docTitle, theme) {
+function buildDocument(contentElements, theme, options = {}) {
+  const {
+    includeToc = true,
+    includeHeader = false,
+    includeFooter = true,
+    headerTitle = 'Document',
+  } = options
   const margin = convertInchesToTwip(1)
 
   // ── Header ────────────────────────────────────────────────
@@ -606,7 +612,7 @@ function buildDocument(contentElements, docTitle, theme) {
     children: [
       new Paragraph({
         alignment: AlignmentType.RIGHT,
-        children: [new TextRun({ text: docTitle, italics: true, color: theme.subtle, size: 18, font: theme.font })],
+        children: [new TextRun({ text: headerTitle, italics: true, color: theme.subtle, size: 18, font: theme.font })],
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: theme.border, space: 1 } },
       }),
     ],
@@ -628,19 +634,21 @@ function buildDocument(contentElements, docTitle, theme) {
   })
 
   // ── TOC page ──────────────────────────────────────────────
-  const tocElements = [
-    new TableOfContents('Table of Contents', {
-      hyperlink: true,
-      headingStyleRange: '1-3',
-    }),
-  ]
+  const tocElements = includeToc
+    ? [
+        new TableOfContents('Table of Contents', {
+          hyperlink: true,
+          headingStyleRange: '1-3',
+        }),
+      ]
+    : []
 
-  // ── Content (first content para gets page break) ──────────
-  const firstContentIdx = contentElements.findIndex(el => el instanceof Paragraph || el instanceof Table)
-  if (firstContentIdx >= 0) {
-    // Wrap it to force page break before
-    contentElements.splice(firstContentIdx, 0, pgBreak())
+  const documentChildren = []
+  if (tocElements.length > 0) {
+    documentChildren.push(...tocElements)
+    if (contentElements.length > 0) documentChildren.push(pgBreak())
   }
+  documentChildren.push(...contentElements)
 
   // ── Assemble document ─────────────────────────────────────
   return new Document({
@@ -673,12 +681,9 @@ function buildDocument(contentElements, docTitle, theme) {
             margin: { top: margin, right: margin, bottom: margin, left: margin, footer: 708, header: 708 },
           },
         },
-        headers: { default: docHeader },
-        footers: { default: docFooter },
-        children: [
-          ...tocElements,
-          ...contentElements,
-        ],
+        headers: includeHeader ? { default: docHeader } : undefined,
+        footers: includeFooter ? { default: docFooter } : undefined,
+        children: documentChildren,
       },
     ],
   })
@@ -687,18 +692,17 @@ function buildDocument(contentElements, docTitle, theme) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
-export async function convertMarkdownToDocx(markdownText, theme) {
+export async function convertMarkdownToDocx(markdownText, theme, options = {}) {
   // Parse markdown to MDAST
   const tree = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .parse(markdownText)
 
-  // Find document title from first H1
-  let docTitle = 'Document'
+  let firstHeadingTitle = 'Document'
   for (const node of tree.children) {
     if (node.type === 'heading' && node.depth === 1) {
-      docTitle = extractText(node)
+      firstHeadingTitle = extractText(node) || firstHeadingTitle
       break
     }
   }
@@ -710,6 +714,9 @@ export async function convertMarkdownToDocx(markdownText, theme) {
   const contentElements = mdastToDocxElements(tree, theme, imageMap)
 
   // Build and pack the document
-  const doc = buildDocument(contentElements, docTitle, theme)
+  const doc = buildDocument(contentElements, theme, {
+    ...options,
+    headerTitle: options.headerTitle?.trim() || firstHeadingTitle,
+  })
   return Packer.toBlob(doc)
 }
